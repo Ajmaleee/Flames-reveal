@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>💌 Flames — Secret Diary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --pink-50:  #fff0f5;
+      --pink-100: #ffe0ec;
+      --pink-200: #ffc2d9;
+      --pink-300: #ff9cbf;
+      --pink-400: #ff6ba0;
+      --pink-500: #f04e83;
+      --pink-600: #d63370;
+      --cream:    #fff8f9;
+      --text-dark:#3a1a26;
+      --text-mid: #7a3a52;
+      --text-soft:#b07080;
+      --white:    #ffffff;
+      --shadow:   0 4px 24px rgba(240,78,131,0.12);
+      --shadow-lg:0 8px 40px rgba(240,78,131,0.18);
+      --radius:   20px;
+      --radius-sm:12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: var(--pink-50);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 60px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, var(--pink-200) 1.5px, transparent 1.5px);
+      background-size: 28px 28px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Floating hearts ── */
+    #hearts-bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    .heart-float {
+      position: absolute; bottom: -60px; opacity: 0;
+      animation: floatUp linear infinite;
+    }
+    @keyframes floatUp {
+      0%   { transform: translateY(0) scale(0.8); opacity: 0; }
+      10%  { opacity: 0.45; }
+      90%  { opacity: 0.25; }
+      100% { transform: translateY(-110vh) scale(1.1); opacity: 0; }
+    }
+
+    /* ── Lock screen ── */
+    #lock-screen {
+      position: relative; z-index: 10;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0; margin-top: 60px;
+    }
+
+    .lock-card {
+      background: var(--white);
+      border: 1.5px solid var(--pink-100);
+      border-radius: var(--radius);
+      padding: 44px 36px 36px;
+      width: 100%; max-width: 380px;
+      box-shadow: var(--shadow-lg);
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+    }
+
+    .lock-icon { font-size: 2.8rem; line-height: 1; margin-bottom: 4px; }
+    .lock-title {
+      font-family: 'Pacifico', cursive;
+      font-size: 1.7rem;
+      color: var(--pink-500);
+      text-align: center;
+    }
+    .lock-sub {
+      font-size: 0.82rem; font-weight: 700;
+      color: var(--text-soft); text-align: center;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    .pin-dots {
+      display: flex; gap: 12px; margin: 8px 0 4px;
+    }
+    .pin-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--pink-100);
+      border: 2px solid var(--pink-200);
+      transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    }
+    .pin-dot.filled {
+      background: var(--pink-500);
+      border-color: var(--pink-500);
+      transform: scale(1.15);
+    }
+
+    .numpad {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 10px; width: 100%;
+    }
+    .num-btn {
+      background: var(--pink-50);
+      border: 1.5px solid var(--pink-100);
+      border-radius: var(--radius-sm);
+      padding: 16px 8px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 1.15rem; font-weight: 800;
+      color: var(--text-dark);
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s, border-color 0.15s;
+      text-align: center;
+    }
+    .num-btn:hover { background: var(--pink-100); border-color: var(--pink-300); }
+    .num-btn:active { transform: scale(0.94); background: var(--pink-200); }
+    .num-btn.del { color: var(--pink-500); font-size: 1.1rem; }
+    .num-btn.enter {
+      background: var(--pink-500); color: var(--white);
+      border-color: var(--pink-500);
+      font-size: 0.9rem; letter-spacing: 0.04em;
+    }
+    .num-btn.enter:hover { background: var(--pink-600); }
+
+    .lock-error {
+      font-size: 0.8rem; font-weight: 800;
+      color: var(--pink-500); min-height: 18px;
+      text-align: center;
+      animation: shake 0.35s ease;
+    }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%      { transform: translateX(-6px); }
+      50%      { transform: translateX(6px); }
+      80%      { transform: translateX(-4px); }
+    }
+
+    /* ── Dashboard ── */
+    #dashboard {
+      display: none;
+      position: relative; z-index: 10;
+      flex-direction: column; align-items: center;
+      width: 100%; max-width: 600px; gap: 20px;
+    }
+
+    .dash-header {
+      text-align: center; width: 100%;
+    }
+    .dash-title {
+      font-family: 'Pacifico', cursive;
+      font-size: 2rem; color: var(--pink-500);
+    }
+    .dash-sub {
+      font-size: 0.82rem; font-weight: 700;
+      color: var(--text-soft); margin-top: 4px;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    /* Stats row */
+    .stats-row {
+      display: flex; gap: 12px; width: 100%;
+    }
+    .stat-card {
+      flex: 1; background: var(--white);
+      border: 1.5px solid var(--pink-100);
+      border-radius: var(--radius-sm);
+      padding: 16px 12px; text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .stat-num {
+      font-family: 'Pacifico', cursive;
+      font-size: 1.8rem; color: var(--pink-500);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.72rem; font-weight: 800;
+      color: var(--text-soft); text-transform: uppercase;
+      letter-spacing: 0.06em; margin-top: 4px;
+    }
+
+    /* Search + controls */
+    .controls {
+      display: flex; gap: 10px; width: 100%; flex-wrap: wrap;
+    }
+    .search-wrap {
+      flex: 1; min-width: 180px;
+      position: relative;
+    }
+    .search-wrap input {
+      width: 100%; padding: 11px 14px 11px 38px;
+      border: 1.5px solid var(--pink-200);
+      border-radius: 50px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 0.9rem; font-weight: 700;
+      color: var(--text-dark); background: var(--white);
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-wrap input:focus {
+      border-color: var(--pink-400);
+      box-shadow: 0 0 0 3px var(--pink-100);
+    }
+    .search-wrap input::placeholder { color: var(--pink-300); }
+    .search-icon {
+      position: absolute; left: 13px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.95rem; pointer-events: none;
+    }
+
+    .btn-sm {
+      padding: 11px 18px;
+      border-radius: 50px;
+      border: 1.5px solid var(--pink-200);
+      background: var(--white);
+      font-family: 'Nunito', sans-serif;
+      font-size: 0.82rem; font-weight: 800;
+      color: var(--text-mid); cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .btn-sm:hover { background: var(--pink-50); transform: translateY(-1px); }
+
+    /* Table card */
+    .table-card {
+      width: 100%; background: var(--white);
+      border: 1.5px solid var(--pink-100);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .table-head {
+      display: grid;
+      grid-template-columns: 36px 1fr 1fr 1fr;
+      gap: 0;
+      background: var(--pink-50);
+      border-bottom: 1.5px solid var(--pink-100);
+      padding: 12px 18px;
+    }
+    .th {
+      font-size: 0.72rem; font-weight: 900;
+      color: var(--text-soft); text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    #entries-list { display: flex; flex-direction: column; }
+
+    .entry-row {
+      display: grid;
+      grid-template-columns: 36px 1fr 1fr 1fr;
+      gap: 0;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--pink-50);
+      align-items: center;
+      transition: background 0.15s;
+      animation: rowIn 0.35s ease both;
+    }
+    .entry-row:last-child { border-bottom: none; }
+    .entry-row:hover { background: var(--pink-50); }
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .entry-num {
+      font-size: 0.75rem; font-weight: 800;
+      color: var(--pink-300);
+    }
+    .entry-name {
+      font-size: 0.92rem; font-weight: 800;
+      color: var(--text-dark);
+    }
+    .entry-crush {
+      font-size: 0.92rem; font-weight: 800;
+      color: var(--pink-500);
+    }
+    .entry-time {
+      font-size: 0.72rem; font-weight: 700;
+      color: var(--text-soft);
+    }
+
+    .empty-state {
+      padding: 48px 24px; text-align: center;
+      color: var(--text-soft); font-weight: 700; font-size: 0.9rem;
+    }
+    .empty-state .empty-icon { font-size: 2.4rem; display: block; margin-bottom: 10px; }
+
+    /* Loading spinner */
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--pink-100);
+      border-top-color: var(--pink-400);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 40px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Refresh pulse */
+    @keyframes pulsePink {
+      0%,100% { box-shadow: 0 0 0 0 rgba(240,78,131,0.3); }
+      50%      { box-shadow: 0 0 0 8px rgba(240,78,131,0); }
+    }
+    .refreshing { animation: pulsePink 1s ease infinite; }
+
+    /* Footer */
+    .footer {
+      margin-top: 20px; text-align: center;
+      font-size: 0.78rem; color: var(--text-soft); font-weight: 600;
+      position: relative; z-index: 10;
+    }
+
+    @media (max-width: 480px) {
+      .lock-card { padding: 32px 20px 28px; }
+      .table-head, .entry-row {
+        grid-template-columns: 28px 1fr 1fr;
+      }
+      .th:last-child, .entry-time { display: none; }
+      .stats-row { gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="hearts-bg"></div>
+
+<!-- Lock Screen -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-icon">🔐</div>
+    <div class="lock-title">Secret Diary</div>
+    <p class="lock-sub">Enter PIN to peek inside 🤫</p>
+
+    <div class="pin-dots">
+      <div class="pin-dot" id="dot-0"></div>
+      <div class="pin-dot" id="dot-1"></div>
+      <div class="pin-dot" id="dot-2"></div>
+      <div class="pin-dot" id="dot-3"></div>
+    </div>
+
+    <div class="lock-error" id="lock-error"></div>
+
+    <div class="numpad">
+      <button class="num-btn" data-digit="1">1</button>
+      <button class="num-btn" data-digit="2">2</button>
+      <button class="num-btn" data-digit="3">3</button>
+      <button class="num-btn" data-digit="4">4</button>
+      <button class="num-btn" data-digit="5">5</button>
+      <button class="num-btn" data-digit="6">6</button>
+      <button class="num-btn" data-digit="7">7</button>
+      <button class="num-btn" data-digit="8">8</button>
+      <button class="num-btn" data-digit="9">9</button>
+      <button class="num-btn del" id="pin-del">⌫</button>
+      <button class="num-btn" data-digit="0">0</button>
+      <button class="num-btn enter" id="pin-enter">✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div class="dash-header">
+    <div class="dash-title">💌 Flames Diary</div>
+    <p class="dash-sub">Everyone who tested their fate</p>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-num" id="stat-total">—</div>
+      <div class="stat-label">Total Entries</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="stat-today">—</div>
+      <div class="stat-label">Today</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="stat-unique">—</div>
+      <div class="stat-label">Unique Names</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Search a name…" />
+    </div>
+    <button class="btn-sm" id="refresh-btn">🔄 Refresh</button>
+    <button class="btn-sm" id="logout-btn">🔒 Lock</button>
+  </div>
+
+  <div class="table-card">
+    <div class="table-head">
+      <div class="th">#</div>
+      <div class="th">Name</div>
+      <div class="th">Crush 💕</div>
+      <div class="th">When</div>
+    </div>
+    <div id="entries-list">
+      <div class="spinner"></div>
+    </div>
+  </div>
+</div>
+
+<p class="footer" id="footer-area" style="display:none">
+  Made with ♥️ by <strong style="color:var(--pink-500)">ajmaleee__</strong> &nbsp;•&nbsp;
+  <a href="https://www.instagram.com/ajmaleee__?igsh=MW4xbHk1bWx6dHlkZA==" target="_blank" rel="noopener"
+     style="color:var(--text-soft);font-weight:800;text-decoration:none;">@ajmaleee__</a>
+</p>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp }    from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, orderBy, query, limit }
+                               from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyAoQEe3TtdYm6v6rs8OFhGOzWxny08iWJg",
+    authDomain:        "flames-72549.firebaseapp.com",
+    projectId:         "flames-72549",
+    storageBucket:     "flames-72549.firebasestorage.app",
+    messagingSenderId: "581723675375",
+    appId:             "1:581723675375:web:01388538a58eb2c10a591a",
+    measurementId:     "G-2E0V3CF2E0"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+
+  const SECRET_PIN = "2580";
+  let allEntries = [];
+  let pinValue   = "";
+
+  function pinPress(digit) {
+    if (pinValue.length >= 4) return;
+    pinValue += digit;
+    updateDots();
+    if (pinValue.length === 4) setTimeout(pinEnter, 180);
+  }
+  function pinDel() {
+    pinValue = pinValue.slice(0, -1);
+    updateDots();
+    document.getElementById("lock-error").textContent = "";
+  }
+  function pinEnter() {
+    if (pinValue === SECRET_PIN) {
+      unlockDashboard();
+    } else {
+      const errEl = document.getElementById("lock-error");
+      errEl.textContent = "Wrong PIN, try again 💔";
+      errEl.style.animation = "none";
+      void errEl.offsetWidth;
+      errEl.style.animation = "";
+      pinValue = ""; updateDots();
+    }
+  }
+  function updateDots() {
+    for (let i = 0; i < 4; i++) {
+      document.getElementById("dot-"+i).classList.toggle("filled", i < pinValue.length);
+    }
+  }
+  function unlockDashboard() {
+    document.getElementById("lock-screen").style.display  = "none";
+    document.getElementById("dashboard").style.display    = "flex";
+    document.getElementById("footer-area").style.display  = "block";
+    loadEntries();
+  }
+  function logout() {
+    document.getElementById("dashboard").style.display   = "none";
+    document.getElementById("footer-area").style.display = "none";
+    document.getElementById("lock-screen").style.display = "flex";
+    pinValue = ""; updateDots();
+    document.getElementById("lock-error").textContent = "";
+  }
+
+  // Wire up buttons via addEventListener (no onclick attributes needed)
+  document.querySelectorAll(".num-btn[data-digit]").forEach(btn => {
+    btn.addEventListener("click", () => pinPress(btn.dataset.digit));
+  });
+  document.getElementById("pin-del").addEventListener("click", pinDel);
+  document.getElementById("pin-enter").addEventListener("click", pinEnter);
+  document.getElementById("refresh-btn").addEventListener("click", loadEntries);
+  document.getElementById("logout-btn").addEventListener("click", logout);
+  document.getElementById("search-input").addEventListener("input", filterEntries);
+
+  document.addEventListener("keydown", e => {
+    if (document.getElementById("lock-screen").style.display === "none") return;
+    if (e.key >= "0" && e.key <= "9") pinPress(e.key);
+    if (e.key === "Backspace") pinDel();
+    if (e.key === "Enter") pinEnter();
+  });
+
+  async function loadEntries() {
+    const btn = document.getElementById("refresh-btn");
+    btn.classList.add("refreshing");
+    document.getElementById("entries-list").innerHTML = '<div class="spinner"></div>';
+    try {
+      const q    = query(collection(db, "submissions"), orderBy("timestamp", "desc"), limit(200));
+      const snap = await getDocs(q);
+      allEntries = [];
+      snap.forEach(doc => {
+        const d = doc.data();
+        allEntries.push({
+          id:        doc.id,
+          userName:  d.userName  || "—",
+          crushName: d.crushName || "—",
+          timestamp: d.timestamp?.toDate() || null
+        });
+      });
+      renderEntries(allEntries);
+      updateStats(allEntries);
+    } catch(err) {
+      document.getElementById("entries-list").innerHTML =
+        `<div class="empty-state"><span class="empty-icon">⚠️</span>Could not load data.<br><small>${err.message}</small></div>`;
+      console.error(err);
+    }
+    btn.classList.remove("refreshing");
+  }
+
+  function renderEntries(list) {
+    const el = document.getElementById("entries-list");
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><span class="empty-icon">🌸</span>No entries yet… share the FLAMES link!</div>';
+      return;
+    }
+    el.innerHTML = list.map((e, i) => `
+      <div class="entry-row" style="animation-delay:${i * 30}ms">
+        <div class="entry-num">${i+1}</div>
+        <div class="entry-name">${escHtml(e.userName)}</div>
+        <div class="entry-crush">${escHtml(e.crushName)}</div>
+        <div class="entry-time">${formatTime(e.timestamp)}</div>
+      </div>
+    `).join("");
+  }
+
+  function filterEntries() {
+    const q = document.getElementById("search-input").value.toLowerCase();
+    const filtered = allEntries.filter(e =>
+      e.userName.toLowerCase().includes(q) || e.crushName.toLowerCase().includes(q)
+    );
+    renderEntries(filtered);
+  }
+
+  function updateStats(list) {
+    document.getElementById("stat-total").textContent = list.length;
+    const today = new Date(); today.setHours(0,0,0,0);
+    document.getElementById("stat-today").textContent = list.filter(e => e.timestamp && e.timestamp >= today).length;
+    document.getElementById("stat-unique").textContent = new Set(list.map(e => e.userName.toLowerCase())).size;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  function formatTime(d) {
+    if (!d) return "—";
+    const diff = Math.floor((new Date() - d) / 1000);
+    if (diff < 60)    return "just now";
+    if (diff < 3600)  return Math.floor(diff/60) + "m ago";
+    if (diff < 86400) return Math.floor(diff/3600) + "h ago";
+    return d.toLocaleDateString("en-GB", { day:"numeric", month:"short" });
+  }
+
+  // Floating hearts
+  const bg = document.getElementById("hearts-bg");
+  const EMOJIS = ["💕","💗","💓","💖","🌸","✨","💝"];
+  for (let i = 0; i < 14; i++) {
+    const h = document.createElement("span");
+    h.className = "heart-float";
+    h.textContent = EMOJIS[i % EMOJIS.length];
+    h.style.cssText = `left:${Math.random()*100}%;font-size:${12+Math.random()*13}px;animation-duration:${7+Math.random()*9}s;animation-delay:${Math.random()*9}s`;
+    bg.appendChild(h);
+  }
+</script>
+</body>
+</html>
+
