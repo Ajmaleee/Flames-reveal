@@ -96,10 +96,10 @@
     }
 
     .pin-dots {
-      display: flex; gap: 12px; margin: 8px 0 4px;
+      display: flex; gap: 10px; margin: 8px 0 4px;
     }
     .pin-dot {
-      width: 14px; height: 14px; border-radius: 50%;
+      width: 13px; height: 13px; border-radius: 50%;
       background: var(--pink-100);
       border: 2px solid var(--pink-200);
       transition: background 0.2s, border-color 0.2s, transform 0.15s;
@@ -135,6 +135,7 @@
       font-size: 0.9rem; letter-spacing: 0.04em;
     }
     .num-btn.enter:hover { background: var(--pink-600); }
+    .num-btn:disabled { opacity: 0.5; cursor: default; }
 
     .lock-error {
       font-size: 0.8rem; font-weight: 800;
@@ -342,13 +343,15 @@
   <div class="lock-card">
     <div class="lock-icon">🔐</div>
     <div class="lock-title">Secret Diary</div>
-    <p class="lock-sub">Enter PIN to peek inside 🤫</p>
+    <p class="lock-sub">Enter passcode to peek inside 🤫</p>
 
     <div class="pin-dots">
       <div class="pin-dot" id="dot-0"></div>
       <div class="pin-dot" id="dot-1"></div>
       <div class="pin-dot" id="dot-2"></div>
       <div class="pin-dot" id="dot-3"></div>
+      <div class="pin-dot" id="dot-4"></div>
+      <div class="pin-dot" id="dot-5"></div>
     </div>
 
     <div class="lock-error" id="lock-error"></div>
@@ -422,9 +425,32 @@
 
 <!-- Firebase -->
 <script type="module">
-  import { initializeApp }    from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
-  import { getFirestore, collection, getDocs, orderBy, query, limit }
-                               from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+  /* ===== REQUIRED FIRESTORE RULES (Firebase Console → Firestore → Rules) =====
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        match /submissions/{docId} {
+          allow create: if request.auth != null;
+          allow read: if request.auth != null
+                      && request.auth.token.email == "diary-owner@flames-diary.app";
+          allow update, delete: if false;
+        }
+      }
+    }
+    NOTE: change the email above to match the admin account you create in
+    Firebase Console → Authentication → Users (see ADMIN_EMAIL below — must match exactly).
+  ============================================================================= */
+
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+
+  import {
+    getFirestore, collection, getDocs, orderBy, query, limit
+  } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+  import {
+    getAuth, signInWithEmailAndPassword, signOut,
+    setPersistence, inMemoryPersistence
+  } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey:            "AIzaSyAoQEe3TtdYm6v6rs8OFhGOzWxny08iWJg",
@@ -436,38 +462,58 @@
     measurementId:     "G-2E0V3CF2E0"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
+  const app  = initializeApp(firebaseConfig);
+  const db   = getFirestore(app);
+  const auth = getAuth(app);
 
-  const SECRET_PIN = "7429";
+  // This is just the "username" half of the admin login — it can stay public.
+  // The real secret is the password you set in Firebase Console, which becomes
+  // your 6-digit passcode below. It must match the email in the Firestore rule above.
+  const ADMIN_EMAIL = "diary-owner@flames-diary.app";
+  const PIN_LENGTH   = 6;
+
+  // Don't persist the session across page loads — always require the passcode.
+  setPersistence(auth, inMemoryPersistence).catch(err => console.error(err));
+
   let allEntries = [];
   let pinValue   = "";
+  let checking   = false;
 
   function pinPress(digit) {
-    if (pinValue.length >= 4) return;
+    if (checking || pinValue.length >= PIN_LENGTH) return;
     pinValue += digit;
     updateDots();
-    if (pinValue.length === 4) setTimeout(pinEnter, 180);
+    if (pinValue.length === PIN_LENGTH) setTimeout(pinEnter, 150);
   }
   function pinDel() {
+    if (checking) return;
     pinValue = pinValue.slice(0, -1);
     updateDots();
     document.getElementById("lock-error").textContent = "";
   }
-  function pinEnter() {
-    if (pinValue === SECRET_PIN) {
+  async function pinEnter() {
+    if (checking || pinValue.length === 0) return;
+    checking = true;
+    setNumpadDisabled(true);
+    try {
+      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pinValue);
       unlockDashboard();
-    } else {
+    } catch (err) {
       const errEl = document.getElementById("lock-error");
-      errEl.textContent = "Wrong PIN, try again 💔";
+      errEl.textContent = "Wrong passcode, try again 💔";
       errEl.style.animation = "none";
       void errEl.offsetWidth;
       errEl.style.animation = "";
       pinValue = ""; updateDots();
     }
+    checking = false;
+    setNumpadDisabled(false);
+  }
+  function setNumpadDisabled(disabled) {
+    document.querySelectorAll(".numpad .num-btn").forEach(b => b.disabled = disabled);
   }
   function updateDots() {
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < PIN_LENGTH; i++) {
       document.getElementById("dot-"+i).classList.toggle("filled", i < pinValue.length);
     }
   }
@@ -475,9 +521,11 @@
     document.getElementById("lock-screen").style.display  = "none";
     document.getElementById("dashboard").style.display    = "flex";
     document.getElementById("footer-area").style.display  = "block";
+    pinValue = ""; updateDots();
     loadEntries();
   }
-  function logout() {
+  async function logout() {
+    try { await signOut(auth); } catch(e) { console.warn(e); }
     document.getElementById("dashboard").style.display   = "none";
     document.getElementById("footer-area").style.display = "none";
     document.getElementById("lock-screen").style.display = "flex";
@@ -507,7 +555,7 @@
     btn.classList.add("refreshing");
     document.getElementById("entries-list").innerHTML = '<div class="spinner"></div>';
     try {
-      const q    = query(collection(db, "submissions"), orderBy("timestamp", "desc"), limit(200));
+      const q    = query(collection(db, "submissions"), orderBy("createdAt", "desc"), limit(200));
       const snap = await getDocs(q);
       allEntries = [];
       snap.forEach(doc => {
@@ -516,7 +564,7 @@
           id:        doc.id,
           userName:  d.userName  || "—",
           crushName: d.crushName || "—",
-          timestamp: d.timestamp?.toDate() || null
+          timestamp: d.createdAt?.toDate() || null
         });
       });
       renderEntries(allEntries);
@@ -585,4 +633,3 @@
 </script>
 </body>
 </html>
-
